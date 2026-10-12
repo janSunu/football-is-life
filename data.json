@@ -1,5 +1,6 @@
 {
   "updatedAt": null,
+  "league": {},
   "teams": [
     { "id": "2-1", "group": "A", "seed": "A1" },
     { "id": "2-6", "group": "A", "seed": "A2" },
