@@ -16,8 +16,6 @@
   --header: #ffffff;
   --shadow: 0 1px 2px rgba(0, 0, 0, .06);
   --input: #f2f2f2;
-  --score-bg: #1a1a1a;
-  --score-text: #ffffff;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -38,8 +36,6 @@
     --header: #1a1a1a;
     --shadow: none;
     --input: #2a2a2a;
-    --score-bg: #f2f2f2;
-    --score-text: #111111;
     color-scheme: dark;
   }
 }
@@ -48,7 +44,6 @@
   --text: #f5f5f5; --text-2: #9d9d9d; --text-3: #6a6a6a;
   --accent: #00b66f; --accent-text: #2ecc8a; --qual-1: #00b66f; --qual-2: #4a8cf0;
   --draw: #6f6f6f; --loss: #e5484d; --header: #1a1a1a; --shadow: none; --input: #2a2a2a;
-  --score-bg: #f2f2f2; --score-text: #111111;
   color-scheme: dark;
 }
 
@@ -125,17 +120,14 @@ main { max-width: 760px; margin: 0 auto; padding: 12px 12px 40px; }
 .fx-team { display: flex; align-items: center; gap: 7px; min-width: 0; font-weight: 600; }
 .fx-team.home { justify-content: flex-end; text-align: right; }
 .fx-team .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fx-team.lose .nm { color: var(--text-2); }
+.fx-team.lose .nm { color: var(--text-3); font-weight: 500; }
 .fx-team.ph .nm { color: var(--text-2); font-weight: 400; }
 .fx-score { text-align: center; font-variant-numeric: tabular-nums; }
 .fx-score .vs { color: var(--text-3); font-weight: 600; font-size: 13px; }
-.sb {
-  display: inline-flex; align-items: center; justify-content: center; gap: 0; min-width: 54px; height: 32px; padding: 0 6px;
-  border-radius: 8px; background: var(--score-bg); color: var(--score-text); font-weight: 800; font-size: 17px; letter-spacing: -.3px;
-}
+.sb { display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 19px; letter-spacing: -.4px; color: var(--text); }
 .sb b { font-weight: 800; min-width: 12px; text-align: center; }
-.sb b.dim { opacity: .55; }
-.sb i { width: 8px; height: 2px; border-radius: 1px; background: currentColor; opacity: .45; margin: 0 6px; }
+.sb b.dim { color: var(--text-3); }
+.sb i { width: 7px; height: 2px; border-radius: 1px; background: var(--text-3); margin: 0 7px; }
 .fx-score .pk { display: block; font-size: 10.5px; color: var(--text-2); font-weight: 600; margin-top: 3px; white-space: nowrap; }
 .fx-edit { color: var(--text-3); display: grid; place-items: center; }
 

@@ -12,9 +12,9 @@
   const DEFAULT_LEAGUE = { name: '경신 런치리그', sub: '2학년', season: '2026년 2학기' };
   const TABS = ['fixtures', 'table', 'bracket', 'stats'];
   const ROUNDS = [
-    { key: 'MW1', title: 'Matchweek 1', ids: ['M1', 'M2', 'M3'] },
-    { key: 'MW2', title: 'Matchweek 2', ids: ['M4', 'M5', 'M6'] },
-    { key: 'MW3', title: 'Matchweek 3', ids: ['M7', 'M8', 'M9'] },
+    { key: 'D1', title: '경기일 1', ids: ['M1', 'M2', 'M3'] },
+    { key: 'D2', title: '경기일 2', ids: ['M4', 'M5', 'M6'] },
+    { key: 'D3', title: '경기일 3', ids: ['M7', 'M8', 'M9'] },
     { key: 'SF', title: '준결승', ids: ['SF1', 'SF2'] },
     { key: 'F', title: '결승', ids: ['F'] },
   ];
@@ -181,7 +181,8 @@
     if (Number.isInteger(m.hp) && Number.isInteger(m.ap) && m.hp !== m.ap) return m.hp > m.ap ? 'home' : 'away';
     return null;
   }
-  function hasPk(m) { return L.isScored(m) && m.stage !== 'group' && m.hs === m.as && Number.isInteger(m.hp) && Number.isInteger(m.ap); }
+  // Shootouts happen in every stage. In the group stage they do not change points.
+  function hasPk(m) { return L.isScored(m) && m.hs === m.as && Number.isInteger(m.hp) && Number.isInteger(m.ap); }
   const isAdmin = () => !!state.token;
   const byNo = (a, b) => a.no - b.no;
   const byDate = (a, b) => (a.date || '9999').localeCompare(b.date || '9999') || a.no - b.no;
@@ -379,16 +380,20 @@
     }
   }
 
+  // Opens on the round of the latest match whose date has arrived, so the
+  // page follows the season without anyone touching it.
   function defaultRound() {
-    const i = ROUNDS.findIndex(r => r.ids.some(id => !state.data.matches.find(m => m.id === id).done));
-    return i < 0 ? ROUNDS.length - 1 : i;
+    const t = todayStr();
+    const last = state.data.matches.filter(m => m.date && m.date <= t).sort(byDate).pop();
+    if (!last) return 0;
+    return ROUNDS.findIndex(r => r.ids.includes(last.id));
   }
 
   function scoreBox(m) {
     if (!L.isScored(m)) return '<span class="vs">vs</span>';
     const win = winnerSide(m);
     return `<span class="sb"><b class="${win === 'away' ? 'dim' : ''}">${m.hs}</b><i></i><b class="${win === 'home' ? 'dim' : ''}">${m.as}</b></span>` +
-      (hasPk(m) ? `<span class="pk">승부차기 ${m.hp}:${m.ap}</span>` : '');
+      (hasPk(m) ? `<span class="pk">PK ${m.hp}:${m.ap}</span>` : '');
   }
 
   function fixtureRow(m) {
@@ -473,7 +478,7 @@
         <div class="rh-mid"><div class="rh-title">${r.title}</div><div class="rh-sub">${span}</div></div>
         <button class="icon-btn" type="button" data-act="round" data-d="1" aria-label="다음 라운드" ${state.round === ROUNDS.length - 1 ? 'disabled' : ''}>${ICON.right}</button>
       </div>
-      <div class="round-steps">${ROUNDS.map((x, i) => `<button type="button" data-act="round-go" data-i="${i}" class="${i === state.round ? 'on' : ''}" aria-label="${x.title}"><i></i><span>${x.key.startsWith('MW') ? x.key.replace('MW', 'MW ') : x.title}</span></button>`).join('')}</div>
+      <div class="round-steps">${ROUNDS.map((x, i) => `<button type="button" data-act="round-go" data-i="${i}" class="${i === state.round ? 'on' : ''}" aria-label="${x.title}"><i></i><span>${x.title}</span></button>`).join('')}</div>
       ${ms.map(fixtureRow).join('')}
       <div class="round-foot">${done}/${ms.length} 경기 종료</div>
     </div>`;
@@ -547,7 +552,7 @@
       <li>골득실</li>
       <li>다득점</li>
       <li>모두 같으면 추첨</li>
-    </ol><p style="margin:10px 0 0">와일드카드는 각 조 2위 중 같은 기준으로 1팀을 뽑음.</p></div></div>`;
+    </ol><p style="margin:10px 0 0">무승부 뒤 승부차기를 해도 승점은 무승부(1점)로 반영됨. 와일드카드는 각 조 2위 중 같은 기준으로 1팀을 뽑음.</p></div></div>`;
     $('#table').innerHTML = html;
   }
 
@@ -786,7 +791,6 @@
   function openEdit(m) {
     const sides = sidesOf(m);
     const h = slotView(sides.home), a = slotView(sides.away);
-    const ko = m.stage !== 'group';
     const later = state.data.matches.filter(x => x.no > m.no && !x.done).length;
     const p = pensOf(m);
     editDraft = {
@@ -807,7 +811,7 @@
           <div class="score-side"><div class="tn">${a.crest}<span>${a.name}</span></div>${stepper('as', m.as)}</div>
         </div>
       </div>
-      ${ko ? `<div class="field" id="pkField" hidden><div class="shoot-edit" id="shootEdit"></div></div>` : ''}
+      <div class="field" id="pkField" hidden><div class="shoot-edit" id="shootEdit"></div>${m.stage === 'group' ? '<p class="hint">조별 리그 승부차기는 기록만 남고 승점은 무승부(1점)로 반영됨.</p>' : ''}</div>
       <div class="field">
         <div class="lab-row"><span class="lab">득점자</span><span class="opt">선택 사항</span></div>
         <div id="goalList" class="goal-list"></div>
@@ -820,7 +824,7 @@
       </div>
       <div class="field"><label for="f-date">날짜</label>
         <div class="btns"><input id="f-date" class="input" type="date" value="${m.date || ''}" style="flex:1">
-        <button class="btn" type="button" data-act="nextday" style="flex:none">다음 경기일로</button></div>
+        <button class="btn" type="button" data-act="nextday" style="flex:none">다음 월, 수로</button></div>
         ${later ? `<label class="check" style="margin:10px 0 0;border-bottom:0"><input type="checkbox" id="f-cascade" checked><span class="t">뒤 경기 ${later}개도 같은 만큼 미루기</span></label>` : ''}
       </div>
       <label class="check"><input type="checkbox" id="f-done" ${m.done ? 'checked' : ''}><span class="t">경기 종료</span><span class="d">체크해야 순위에 반영됨</span></label>
@@ -922,13 +926,12 @@
       m.hs = done ? hs : null;
       m.as = done ? as : null;
       if (goals.length) m.goals = goals; else delete m.goals;
-      if (m.stage !== 'group') {
-        if (!tie) { m.hp = null; m.ap = null; delete m.pens; }
-        else if (touched) {
-          if (hasKicks) { m.pens = pens; m.hp = kicksMade(pens.h); m.ap = kicksMade(pens.a); }
-          else { delete m.pens; m.hp = null; m.ap = null; }
-        }
+      if (!tie) { m.hp = null; m.ap = null; delete m.pens; }
+      else if (touched) {
+        if (hasKicks) { m.pens = pens; m.hp = kicksMade(pens.h); m.ap = kicksMade(pens.a); }
+        else { delete m.pens; m.hp = null; m.ap = null; }
       }
+      if (m.stage === 'group' && m.hp === null && m.ap === null) { delete m.hp; delete m.ap; }
     }, `${commitTitle(m0)} ${clear ? '결과 삭제' : done ? `결과 ${hs}:${as}` : '수정'}`));
   }
 
@@ -1121,7 +1124,7 @@
   function openSchedule() {
     draft = JSON.parse(JSON.stringify(state.data));
     openSheet(`<h2>일정 편집</h2>
-      <p class="lead">미루기를 누르면 그 경기와 뒤 경기들이 한 경기일(월, 수)씩 뒤로 밀림. 저장 전까지는 반영되지 않음.</p>
+      <p class="lead">미루기를 누르면 그 경기와 뒤 경기들이 다음 월, 수로 한 칸씩 밀림. 저장 전까지는 반영되지 않음.</p>
       <label class="check" style="margin-top:-4px"><input type="checkbox" id="s-cascade" checked><span class="t">날짜를 직접 바꿀 때 뒤 경기도 같이 밀기</span></label>
       <div id="schedList"></div>
       <p class="msg"></p>
