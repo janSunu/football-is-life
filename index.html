@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>경신 런치리그 2학년</title>
+<meta name="description" content="경신고등학교 2학년 런치리그 일정, 결과, 순위, 토너먼트">
+<meta name="theme-color" content="#0f0f0f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f2f2f2" media="(prefers-color-scheme: light)">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="league">
+      <img class="league-crest" src="icon.svg" alt="" width="40" height="40">
+      <div class="league-text">
+        <h1>경신 런치리그</h1>
+        <p><span>2학년</span><span class="sep"></span><span>2026년 2학기</span></p>
+      </div>
+    </div>
+    <button class="icon-btn" id="adminBtn" type="button" aria-label="관리자">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+    </button>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="fixtures" aria-selected="true">경기</button>
+    <button role="tab" data-tab="table" aria-selected="false">순위</button>
+    <button role="tab" data-tab="bracket" aria-selected="false">토너먼트</button>
+  </nav>
+</header>
+
+<div class="statusbar" id="statusbar" hidden></div>
+
+<main id="main">
+  <section id="fixtures" class="view"></section>
+  <section id="table" class="view" hidden></section>
+  <section id="bracket" class="view" hidden></section>
+  <p class="foot" id="foot"></p>
+</main>
+
+<div class="sheet-backdrop" id="backdrop" hidden></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
+
+<script src="league.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

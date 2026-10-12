@@ -1,0 +1,29 @@
+{
+  "updatedAt": null,
+  "teams": [
+    { "id": "2-1", "group": "A", "seed": "A1" },
+    { "id": "2-6", "group": "A", "seed": "A2" },
+    { "id": "2-7", "group": "A", "seed": "A3" },
+    { "id": "2-2", "group": "B", "seed": "B1" },
+    { "id": "2-3", "group": "B", "seed": "B2" },
+    { "id": "2-5", "group": "B", "seed": "B3" },
+    { "id": "2-4", "group": "C", "seed": "C1" },
+    { "id": "2-8", "group": "C", "seed": "C2" },
+    { "id": "2-9", "group": "C", "seed": "C3" }
+  ],
+  "matches": [
+    { "id": "M1", "no": 1, "stage": "group", "group": "A", "home": "2-1", "away": "2-6", "date": "2026-10-14", "done": false, "hs": null, "as": null },
+    { "id": "M2", "no": 2, "stage": "group", "group": "B", "home": "2-2", "away": "2-3", "date": "2026-10-19", "done": false, "hs": null, "as": null },
+    { "id": "M3", "no": 3, "stage": "group", "group": "C", "home": "2-4", "away": "2-8", "date": "2026-10-21", "done": false, "hs": null, "as": null },
+    { "id": "M4", "no": 4, "stage": "group", "group": "A", "home": "2-1", "away": "2-7", "date": "2026-10-26", "done": false, "hs": null, "as": null },
+    { "id": "M5", "no": 5, "stage": "group", "group": "B", "home": "2-2", "away": "2-5", "date": "2026-10-28", "done": false, "hs": null, "as": null },
+    { "id": "M6", "no": 6, "stage": "group", "group": "C", "home": "2-4", "away": "2-9", "date": "2026-11-02", "done": false, "hs": null, "as": null },
+    { "id": "M7", "no": 7, "stage": "group", "group": "A", "home": "2-6", "away": "2-7", "date": "2026-11-04", "done": false, "hs": null, "as": null },
+    { "id": "M8", "no": 8, "stage": "group", "group": "B", "home": "2-3", "away": "2-5", "date": "2026-11-09", "done": false, "hs": null, "as": null },
+    { "id": "M9", "no": 9, "stage": "group", "group": "C", "home": "2-8", "away": "2-9", "date": "2026-11-11", "done": false, "hs": null, "as": null },
+    { "id": "SF1", "no": 10, "stage": "sf", "date": "2026-11-16", "done": false, "hs": null, "as": null, "hp": null, "ap": null },
+    { "id": "SF2", "no": 11, "stage": "sf", "date": "2026-11-18", "done": false, "hs": null, "as": null, "hp": null, "ap": null },
+    { "id": "F", "no": 12, "stage": "final", "date": "2026-11-23", "done": false, "hs": null, "as": null, "hp": null, "ap": null }
+  ],
+  "lots": {}
+}
