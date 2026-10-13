@@ -43,8 +43,13 @@
       const h = rows[m.home], a = rows[m.away];
       h.p++; a.p++;
       h.gf += m.hs; h.ga += m.as; a.gf += m.as; a.ga += m.hs;
-      if (m.hs > m.as) { h.w++; a.l++; h.pts += 3; h.form.push('W'); a.form.push('L'); }
-      else if (m.hs < m.as) { a.w++; h.l++; a.pts += 3; h.form.push('L'); a.form.push('W'); }
+      // A shootout win counts as a win (3 points), a shootout loss as a loss.
+      // Goal difference and goals scored use the regulation score only.
+      const pk = m.hs === m.as && Number.isInteger(m.hp) && Number.isInteger(m.ap) && m.hp !== m.ap;
+      const homeWon = m.hs > m.as || (pk && m.hp > m.ap);
+      const awayWon = m.as > m.hs || (pk && m.ap > m.hp);
+      if (homeWon) { h.w++; a.l++; h.pts += 3; h.form.push('W'); a.form.push('L'); }
+      else if (awayWon) { a.w++; h.l++; a.pts += 3; h.form.push('L'); a.form.push('W'); }
       else { h.d++; a.d++; h.pts++; a.pts++; h.form.push('D'); a.form.push('D'); }
     }
     const list = Object.values(rows);

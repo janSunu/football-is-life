@@ -9,7 +9,7 @@
   const DATA_PATH = 'data.json';
   const TOKEN_KEY = 'lunchleague.token';
   const TAB_KEY = 'lunchleague.tab';
-  const DEFAULT_LEAGUE = { name: '경신 런치리그', sub: '2학년', season: '2026년 2학기' };
+  const DEFAULT_LEAGUE = { name: '경신 런치리그', sub: '2학년', tagline: '무려 수작업으로 업데이트되는 최첨단 시스템' };
   const TABS = ['fixtures', 'table', 'bracket', 'stats'];
   const ROUNDS = [
     { key: 'D1', title: '경기일 1', ids: ['M1', 'M2', 'M3'] },
@@ -181,7 +181,7 @@
     if (Number.isInteger(m.hp) && Number.isInteger(m.ap) && m.hp !== m.ap) return m.hp > m.ap ? 'home' : 'away';
     return null;
   }
-  // Shootouts happen in every stage. In the group stage they do not change points.
+  // Shootouts happen in every stage. A shootout win is worth 3 points like any win.
   function hasPk(m) { return L.isScored(m) && m.hs === m.as && Number.isInteger(m.hp) && Number.isInteger(m.ap); }
   const isAdmin = () => !!state.token;
   const byNo = (a, b) => a.no - b.no;
@@ -362,7 +362,7 @@
     renderStats();
     const u = state.data.updatedAt;
     $('#foot').innerHTML = (u ? `마지막 업데이트 ${new Date(u).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })}<br>` : '') +
-      '경기 일정은 학사 일정과 날씨에 따라 바뀔 수 있음.';
+      '결과 기재에 오류가 있으면 제보 부탁합니다.';
   }
 
   function renderLeague() {
@@ -480,7 +480,7 @@
       </div>
       <div class="round-steps">${ROUNDS.map((x, i) => `<button type="button" data-act="round-go" data-i="${i}" class="${i === state.round ? 'on' : ''}" aria-label="${x.title}"><i></i><span>${x.title}</span></button>`).join('')}</div>
       ${ms.map(fixtureRow).join('')}
-      <div class="round-foot">${done}/${ms.length} 경기 종료</div>
+      <div class="round-foot">${done}경기 완료</div>
     </div>`;
     $('#fixtures').innerHTML = html;
   }
@@ -515,9 +515,9 @@
       const tied = t.rows.filter(r => r.statTie);
       const resolved = tied.length > 0 && !t.rows.some(r => r.tied);
       html += `<div class="card">
-        <div class="card-head"><span>${t.group}조</span><span class="sub">${t.played}/${t.total} 경기</span></div>
+        <div class="card-head"><span>${t.group}조</span><span class="sub">${t.played}경기 완료</span></div>
         <table class="tbl">
-          <thead><tr><th class="l" style="padding-left:16px">#</th><th class="l">팀</th><th class="c">경기</th><th class="c">승</th><th class="c">무</th><th class="c">패</th><th class="gs">득/실</th><th class="gd">골득실</th><th class="pts">승점</th><th class="form">최근</th></tr></thead>
+          <thead><tr><th class="l" style="padding-left:16px">#</th><th class="l">팀</th><th class="c">경기</th><th class="c">승</th><th class="c">무</th><th class="c">패</th><th class="gs">득/실</th><th class="gd">골득실</th><th class="pts">승점</th><th class="form">현폼</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
         ${t.done && tied.length ? tieNote(t.group, tied.length, resolved) : ''}
@@ -552,7 +552,7 @@
       <li>골득실</li>
       <li>다득점</li>
       <li>모두 같으면 추첨</li>
-    </ol><p style="margin:10px 0 0">무승부 뒤 승부차기를 해도 승점은 무승부(1점)로 반영됨. 와일드카드는 각 조 2위 중 같은 기준으로 1팀을 뽑음.</p></div></div>`;
+    </ol><p style="margin:10px 0 0">승부차기 승리도 정규시간 승리처럼 3점. 골득실과 다득점에는 정규시간 점수만 들어감. 와일드카드는 각 조 2위 중 같은 기준으로 1팀을 뽑음.</p></div></div>`;
     $('#table').innerHTML = html;
   }
 
@@ -656,7 +656,7 @@
         ${sc.map(r => `<tr data-act="team" data-id="${r.team}"><td class="pos">${r.rank}</td>
           <td class="team l"><span>${crest(r.team)}<span class="pl"><b>${esc(r.name)}</b><small>${teamName(r.team)}</small></span></span></td>
           <td class="c">${r.matches.size}</td><td class="pts">${r.goals}</td></tr>`).join('')}
-      </tbody></table>` : '<p class="empty">아직 기록된 득점자 없음.<br>경기 결과에 득점자를 넣으면 여기에 쌓임.</p>'}
+      </tbody></table>` : '<p class="empty">아직 아무도 골을 넣지 않았나 보네요.<br>아니면 죄다 자책골이었거나</p>'}
     </div>`;
     const tt = teamTotals();
     html += `<div class="section-title">팀 득점</div><div class="card">
@@ -811,7 +811,7 @@
           <div class="score-side"><div class="tn">${a.crest}<span>${a.name}</span></div>${stepper('as', m.as)}</div>
         </div>
       </div>
-      <div class="field" id="pkField" hidden><div class="shoot-edit" id="shootEdit"></div>${m.stage === 'group' ? '<p class="hint">조별 리그 승부차기는 기록만 남고 승점은 무승부(1점)로 반영됨.</p>' : ''}</div>
+      <div class="field" id="pkField" hidden><div class="shoot-edit" id="shootEdit"></div>${m.stage === 'group' ? '<p class="hint">승부차기 승리는 승점 3점, 패배는 0점. 골득실에는 정규시간 점수만 반영됨.</p>' : ''}</div>
       <div class="field">
         <div class="lab-row"><span class="lab">득점자</span><span class="opt">선택 사항</span></div>
         <div id="goalList" class="goal-list"></div>
@@ -1106,7 +1106,7 @@
   function syncLeagueDraft() {
     const name = esc((leagueDraft.name || '').trim() || DEFAULT_LEAGUE.name);
     $('#leaguePrev').innerHTML = `<img class="league-crest ${leagueDraft.logo ? 'custom' : ''}" src="${leagueDraft.logo || 'icon.svg'}" alt="" width="48" height="48">
-      <div><div class="lp-name">${name}</div><div class="lp-sub">${DEFAULT_LEAGUE.sub}<span class="sep"></span>${DEFAULT_LEAGUE.season}</div></div>`;
+      <div><div class="lp-name">${name}</div><div class="lp-sub">${DEFAULT_LEAGUE.tagline}</div></div>`;
     $('#llogoClear').hidden = !leagueDraft.logo;
   }
   async function saveLeague(btn) {
