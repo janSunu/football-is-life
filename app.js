@@ -19,6 +19,7 @@
     { key: 'F', title: '결승', ids: ['F'] },
   ];
   const PEN_ROUNDS = 5;
+  const FF_GOALS = 3; // a forfeit is recorded as 3:0
 
   function detectRepo() {
     const host = location.hostname;
@@ -175,7 +176,29 @@
     if (slot.unknown) return { name: '?', crest: phCrest('?', size), cls: 'ph' };
     return { name: slot.label, crest: phCrest('', size), cls: 'ph' };
   }
+  function isWd(id) { return !!(id && teamObj(id).withdrawn); }
+  // The side that gave a match up: an entered forfeit, or a withdrawn team
+  // in a knockout match it has not played.
+  function ffSide(m) {
+    if (L.isScored(m)) return m.ff === 'h' || m.ff === 'a' ? m.ff : null;
+    const s = sidesOf(m);
+    if (!s.home.team || !s.away.team) return null;
+    const h = isWd(s.home.team), a = isWd(s.away.team);
+    return h === a ? null : h ? 'h' : 'a';
+  }
+  function ffName(m) {
+    const f = ffSide(m);
+    if (!f) return '';
+    const s = sidesOf(m);
+    return teamShort((f === 'h' ? s.home : s.away).team);
+  }
+  // Team name for tables: struck through once the team has withdrawn.
+  function nameCell(id) {
+    return `${crest(id)}<span class="nm${isWd(id) ? ' wd' : ''}">${teamName(id)}</span>${isWd(id) ? '<em class="wd-tag">기권</em>' : ''}`;
+  }
   function winnerSide(m) {
+    const ff = ffSide(m);
+    if (ff) return ff === 'h' ? 'away' : 'home';
     if (!L.isScored(m)) return null;
     if (m.hs !== m.as) return m.hs > m.as ? 'home' : 'away';
     if (Number.isInteger(m.hp) && Number.isInteger(m.ap) && m.hp !== m.ap) return m.hp > m.ap ? 'home' : 'away';
@@ -390,23 +413,25 @@
   }
 
   function scoreBox(m) {
-    if (!L.isScored(m)) return '<span class="vs">vs</span>';
+    const ff = ffSide(m);
+    if (!L.isScored(m)) return ff ? '<span class="ffx">기권</span>' : '<span class="vs">vs</span>';
     const win = winnerSide(m);
     return `<span class="sb"><b class="${win === 'away' ? 'dim' : ''}">${m.hs}</b><i></i><b class="${win === 'home' ? 'dim' : ''}">${m.as}</b></span>` +
-      (hasPk(m) ? `<span class="pk">PK ${m.hp}:${m.ap}</span>` : '');
+      (ff ? '<span class="pk ff-l">기권</span>' : hasPk(m) ? `<span class="pk">PK ${m.hp}:${m.ap}</span>` : '');
   }
 
   function fixtureRow(m) {
     const sides = sidesOf(m);
     const h = slotView(sides.home, '', true), a = slotView(sides.away, '', true);
     const win = winnerSide(m);
+    const ff = ffSide(m);
     const rel = m.date ? relDay(m.date) : '';
     const date = m.date ? (rel === '오늘' ? '<b class="today">오늘</b>' : `<b>${fmtDot(m.date)}</b>`) : '<b>날짜 미정</b>';
     return `<button class="fx" data-act="match" data-id="${m.id}" type="button">
       <div class="fx-meta">${date}<span>${m.stage === 'group' ? `${m.group}조` : stageLabel(m)}</span></div>
-      <div class="fx-team home ${h.cls} ${win === 'away' ? 'lose' : ''}"><span class="nm">${h.name}</span>${h.crest}</div>
+      <div class="fx-team home ${h.cls} ${win === 'away' ? 'lose' : ''} ${ff === 'h' ? 'ff' : ''}"><span class="nm">${h.name}</span>${h.crest}</div>
       <div class="fx-score">${scoreBox(m)}</div>
-      <div class="fx-team away ${a.cls} ${win === 'home' ? 'lose' : ''}">${a.crest}<span class="nm">${a.name}</span></div>
+      <div class="fx-team away ${a.cls} ${win === 'home' ? 'lose' : ''} ${ff === 'a' ? 'ff' : ''}">${a.crest}<span class="nm">${a.name}</span></div>
       <div class="fx-edit">${isAdmin() ? ICON.pen : ''}</div>
     </button>`;
   }
@@ -417,7 +442,7 @@
     const ms = state.data.matches;
     const todayDone = ms.filter(m => m.date === t && L.isScored(m)).sort(byNo).pop();
     if (todayDone) return { m: todayDone, label: '오늘 결과' };
-    const next = ms.filter(m => !m.done && (!m.date || m.date >= t)).sort(byDate)[0];
+    const next = ms.filter(m => !m.done && !ffSide(m) && (!m.date || m.date >= t)).sort(byDate)[0];
     if (next) return { m: next, label: '다음 경기' };
     const last = ms.filter(m => L.isScored(m)).sort(byDate).pop();
     if (last) return { m: last, label: m => (m.id === 'F' ? '결승 결과' : '최근 결과') };
@@ -435,7 +460,7 @@
     const ac = sides.away.team ? deep(colorOf(sides.away.team)) : '#2f2f2f';
     let center;
     if (L.isScored(m)) {
-      const sub = hasPk(m) ? `승부차기 ${m.hp}:${m.ap}` : '종료';
+      const sub = ffSide(m) ? `${ffName(m)} 기권` : hasPk(m) ? `승부차기 ${m.hp}:${m.ap}` : '종료';
       center = `<div class="ft-score">${m.hs}<i></i>${m.as}</div><div class="ft-sub">${sub}</div>`;
     } else if (m.date) {
       const n = dayDiff(m.date);
@@ -449,9 +474,9 @@
       style="--fh:${hc};--fa:${ac};--fh2:${mix(hc, '#000000', 0.35)};--fa2:${mix(ac, '#000000', 0.35)}">
       <div class="ft-top"><b>${label}</b><span>${matchTitle(m)}</span></div>
       <div class="ft-row">
-        <div class="ft-team">${h.crest}<span class="nm">${h.name}</span></div>
+        <div class="ft-team ${ffSide(m) === 'h' ? 'ff' : ''}">${h.crest}<span class="nm">${h.name}</span></div>
         <div class="ft-mid">${center}</div>
-        <div class="ft-team">${a.crest}<span class="nm">${a.name}</span></div>
+        <div class="ft-team ${ffSide(m) === 'a' ? 'ff' : ''}">${a.crest}<span class="nm">${a.name}</span></div>
       </div>
       ${goals}
     </button>`;
@@ -503,9 +528,9 @@
     let html = '';
     for (const t of state.view.tables) {
       const rows = t.rows.map((r, i) => `
-        <tr class="${i === 0 ? 'q1' : i === 1 ? 'q2' : ''}" data-act="team" data-id="${r.team}">
-          <td class="pos">${t.played ? r.rank : i + 1}</td>
-          <td class="team l"><span>${crest(r.team)}<span class="nm">${teamName(r.team)}</span></span></td>
+        <tr class="${r.wd ? 'wd-row' : i === 0 ? 'q1' : i === 1 ? 'q2' : ''}" data-act="team" data-id="${r.team}">
+          <td class="pos">${r.wd ? '-' : t.played ? r.rank : i + 1}</td>
+          <td class="team l"><span>${nameCell(r.team)}</span></td>
           <td class="c">${r.p}</td><td class="c">${r.w}</td><td class="c">${r.d}</td><td class="c">${r.l}</td>
           <td class="gs">${r.gf}-${r.ga}</td>
           <td class="gd">${gdText(r.gd)}</td>
@@ -552,7 +577,7 @@
       <li>골득실</li>
       <li>다득점</li>
       <li>모두 같으면 추첨</li>
-    </ol><p style="margin:10px 0 0">승부차기 승리도 정규시간 승리처럼 3점. 골득실과 다득점에는 정규시간 점수만 들어감. 와일드카드는 각 조 2위 중 같은 기준으로 1팀을 뽑음.</p></div></div>`;
+    </ol><p style="margin:10px 0 0">기권승은 ${FF_GOALS}:0 승리로 기록됨. 대회를 기권한 팀은 승점과 관계없이 조 최하위로 내려가고, 남은 경기는 모두 상대 팀 기권승.</p><p style="margin:8px 0 0">승부차기 승리도 정규시간 승리처럼 3점. 골득실과 다득점에는 정규시간 점수만 들어감. 와일드카드는 각 조 2위 중 같은 기준으로 1팀을 뽑음.</p></div></div>`;
     $('#table').innerHTML = html;
   }
 
@@ -574,13 +599,14 @@
     const row = (slot, s, p, side) => {
       const v = slotView(slot, '', true);
       const won = win === side && slot.team;
-      return `<div class="br-row ${v.cls} ${win && win !== side ? 'lose' : ''} ${won ? 'won tc' : ''}" ${won ? `style="${tcVars(colorOf(slot.team))}"` : ''}>
+      const ff = ffSide(m) === (side === 'home' ? 'h' : 'a');
+      return `<div class="br-row ${v.cls} ${win && win !== side ? 'lose' : ''} ${ff ? 'ff' : ''} ${won ? 'won tc' : ''}" ${won ? `style="${tcVars(colorOf(slot.team))}"` : ''}>
         ${v.crest}<span class="nm">${v.name}</span>
         <span class="sc">${scored ? `${pk ? `<small>(${p})</small>` : ''}${s}` : ''}</span></div>`;
     };
     return `<button class="br-match" data-act="match" data-id="${m.id}" type="button">
       ${row(sides.home, m.hs, m.hp, 'home')}${row(sides.away, m.as, m.ap, 'away')}
-      <div class="br-date">${m.date ? fmtShort(m.date) : '날짜 미정'}${scored ? '<span>종료</span>' : ''}</div>
+      <div class="br-date">${m.date ? fmtShort(m.date) : '날짜 미정'}${ffSide(m) ? '<span class="ff-l">기권</span>' : scored ? '<span>종료</span>' : ''}</div>
     </button>`;
   }
 
@@ -622,7 +648,7 @@
   function teamTotals() {
     const rows = Object.fromEntries(state.data.teams.map(t => [t.id, { team: t.id, p: 0, gf: 0, ga: 0 }]));
     for (const m of state.data.matches) {
-      if (!L.isScored(m)) continue;
+      if (!L.isScored(m) || m.ff) continue;
       const s = sidesOf(m);
       if (!s.home.team || !s.away.team) continue;
       const h = rows[s.home.team], a = rows[s.away.team];
@@ -661,9 +687,9 @@
     const tt = teamTotals();
     html += `<div class="section-title">팀 득점</div><div class="card">
       <table class="tbl"><thead><tr><th class="l" style="padding-left:16px">#</th><th class="l">팀</th><th class="c">경기</th><th class="c">득점</th><th class="c">실점</th></tr></thead><tbody>
-      ${tt.map(r => `<tr data-act="team" data-id="${r.team}"><td class="pos">${r.rank}</td><td class="team l"><span>${crest(r.team)}<span class="nm">${teamName(r.team)}</span></span></td><td class="c">${r.p}</td><td class="c strong">${r.gf}</td><td class="c">${r.ga}</td></tr>`).join('')}
+      ${tt.map(r => `<tr data-act="team" data-id="${r.team}"><td class="pos">${r.rank}</td><td class="team l"><span>${nameCell(r.team)}</span></td><td class="c">${r.p}</td><td class="c strong">${r.gf}</td><td class="c">${r.ga}</td></tr>`).join('')}
       </tbody></table>
-      <p class="tbl-note">토너먼트 경기 포함, 승부차기 제외.</p>
+      <p class="tbl-note">토너먼트 경기 포함, 승부차기와 기권 경기 제외.</p>
     </div>`;
     $('#stats').innerHTML = html;
   }
@@ -744,9 +770,11 @@
       ac ? `linear-gradient(270deg, ${rgba(ac, tint(ac))} 0%, ${rgba(ac, tint(ac) * 0.3)} 36%, ${rgba(ac, 0)} 50%)` : '',
     ].filter(Boolean).join(',');
     const stripe = `linear-gradient(90deg, ${hc ? lineColor(hc) : 'var(--line)'} 0 50%, ${ac ? lineColor(ac) : 'var(--line)'} 50% 100%)`;
-    const team = (v, side) => `<${v.id ? `button data-act="team" data-id="${v.id}" type="button"` : 'div'} class="mh-team ${win && win !== side ? 'lose' : ''}">${v.crest}<span class="nm">${v.name}</span></${v.id ? 'button' : 'div'}>`;
+    const ff = ffSide(m);
+    const team = (v, side) => `<${v.id ? `button data-act="team" data-id="${v.id}" type="button"` : 'div'} class="mh-team ${win && win !== side ? 'lose' : ''} ${ff === side[0] ? 'ff' : ''}">${v.crest}<span class="nm">${v.name}</span></${v.id ? 'button' : 'div'}>`;
     let score = '<span class="vs">vs</span>';
-    if (L.isScored(m)) score = `<span class="big">${m.hs}<i>-</i>${m.as}</span><span class="pk">${hasPk(m) ? `승부차기 ${m.hp}:${m.ap}` : '종료'}</span>`;
+    if (L.isScored(m)) score = `<span class="big">${m.hs}<i>-</i>${m.as}</span><span class="pk ${ff ? 'ff-l' : ''}">${ff ? `${ffName(m)} 기권` : hasPk(m) ? `승부차기 ${m.hp}:${m.ap}` : '종료'}</span>`;
+    else if (ff) score = `<span class="vs ffx">기권</span><span class="pk ff-l">${ffName(m)} 기권</span>`;
     else if (m.date) score = `<span class="vs">vs</span><span class="pk">${relDay(m.date) || fmtDot(m.date)}</span>`;
     return `<div class="hero match-hero" style="background:${bg || 'none'}">
       <div class="grip"></div>
@@ -762,6 +790,11 @@
     if (isAdmin()) { openEdit(m); return; }
     const sides = sidesOf(m);
     let body = shootoutView(m, sides);
+    const ff = ffSide(m);
+    if (ff) {
+      const winner = (ff === 'h' ? sides.away : sides.home).team;
+      body += `<p class="ff-note">${ffName(m)} ${isWd((ff === 'h' ? sides.home : sides.away).team) ? '대회 기권' : '기권'}, ${teamShort(winner)} 기권승.${L.isScored(m) ? ` 기록 점수 ${m.hs}:${m.as}.` : ''}</p>`;
+    }
     if (m.stage === 'group') {
       const t = state.view.tables.find(x => x.group === m.group);
       body += `<div class="sheet-sec">${m.group}조 순위</div><div class="mini">${miniTable(t, [m.home, m.away])}</div>`;
@@ -775,7 +808,7 @@
 
   function miniTable(t, highlight) {
     return `<table class="tbl mini-tbl"><thead><tr><th class="l" style="padding-left:12px">#</th><th class="l">팀</th><th class="c">경기</th><th class="gd">골득실</th><th class="pts">승점</th></tr></thead><tbody>
-      ${t.rows.map((r, i) => `<tr data-act="team" data-id="${r.team}" class="${highlight.includes(r.team) ? 'hl' : ''}"><td class="pos">${t.played ? r.rank : i + 1}</td><td class="team l"><span>${crest(r.team)}<span class="nm">${teamName(r.team)}</span></span></td><td class="c">${r.p}</td><td class="gd">${gdText(r.gd)}</td><td class="pts">${r.pts}</td></tr>`).join('')}
+      ${t.rows.map((r, i) => `<tr data-act="team" data-id="${r.team}" class="${highlight.includes(r.team) ? 'hl' : ''} ${r.wd ? 'wd-row' : ''}"><td class="pos">${r.wd ? '-' : t.played ? r.rank : i + 1}</td><td class="team l"><span>${nameCell(r.team)}</span></td><td class="c">${r.p}</td><td class="gd">${gdText(r.gd)}</td><td class="pts">${r.pts}</td></tr>`).join('')}
     </tbody></table>`;
   }
 
@@ -800,10 +833,19 @@
       pens: p ? { h: p.h.slice(), a: p.a.slice() } : { h: [], a: [] },
       pensTouched: false,
       legacyPk: !p && Number.isInteger(m.hp) ? `${m.hp}:${m.ap}` : null,
+      ff: m.ff === 'h' || m.ff === 'a' ? m.ff : null,
     };
     editDraft.rounds = Math.max(PEN_ROUNDS, editDraft.pens.h.length, editDraft.pens.a.length);
     const dl = (s, team) => team ? `<datalist id="dl-${s}">${namesFor(team).map(n => `<option value="${esc(n)}">`).join('')}</datalist>` : '';
     openSheet(`
+      <div class="field"><span class="lab">결과</span>
+        <div class="seg" id="ffSeg">
+          <button type="button" data-act="ff" data-v="">정상 경기</button>
+          <button type="button" data-act="ff" data-v="h">${slotView(sides.home, '', true).name} 기권</button>
+          <button type="button" data-act="ff" data-v="a">${slotView(sides.away, '', true).name} 기권</button>
+        </div>
+        <p class="hint" id="ffHint" hidden>기권한 팀은 패배(0점), 상대는 승리(3점). 점수는 ${FF_GOALS}:0으로 들어가며 필요하면 바꿀 수 있음.</p>
+      </div>
       <div class="field"><span class="lab">점수</span>
         <div class="score-edit">
           <div class="score-side"><div class="tn">${h.crest}<span>${h.name}</span></div>${stepper('hs', m.hs)}</div>
@@ -812,7 +854,7 @@
         </div>
       </div>
       <div class="field" id="pkField" hidden><div class="shoot-edit" id="shootEdit"></div>${m.stage === 'group' ? '<p class="hint">승부차기 승리는 승점 3점, 패배는 0점. 골득실에는 정규시간 점수만 반영됨.</p>' : ''}</div>
-      <div class="field">
+      <div class="field" id="goalField">
         <div class="lab-row"><span class="lab">득점자</span><span class="opt">선택 사항</span></div>
         <div id="goalList" class="goal-list"></div>
         <div class="add-goal">
@@ -836,6 +878,17 @@
       </div>`, matchHero(m));
     renderGoalList();
     renderShootEdit();
+    syncFf();
+  }
+
+  function syncFf() {
+    const ff = editDraft.ff;
+    document.querySelectorAll('#ffSeg button').forEach(b => {
+      b.classList.toggle('on', (b.dataset.v || null) === ff);
+      b.classList.toggle('danger', !!b.dataset.v);
+    });
+    $('#ffHint').hidden = !ff;
+    $('#goalField').hidden = !!ff;
     syncPk();
   }
 
@@ -899,7 +952,7 @@
     syncGoalHint();
     if (!f) return;
     const hs = readInt('hs'), as = readInt('as');
-    f.hidden = !(hs !== null && as !== null && hs === as);
+    f.hidden = !!(editDraft && editDraft.ff) || !(hs !== null && as !== null && hs === as);
   }
 
   async function saveMatch(btn, clear) {
@@ -909,10 +962,12 @@
     const cascade = !!($('#f-cascade') && $('#f-cascade').checked);
     let hs = readInt('hs'), as = readInt('as');
     let done = $('#f-done').checked;
+    const ff = clear ? null : editDraft.ff;
+    if (ff) done = true;
     if (clear) { hs = as = null; done = false; }
     if (done && (hs === null || as === null)) { sheetError('종료로 저장하려면 두 팀 점수가 모두 있어야 함.'); return; }
-    const tie = done && hs === as;
-    const goals = clear ? [] : editDraft.goals
+    const tie = done && !ff && hs === as;
+    const goals = clear || ff ? [] : editDraft.goals
       .map(g => ({ s: g.s, n: (g.n || '').trim().slice(0, 10), ...(Number.isInteger(g.m) ? { m: g.m } : {}), ...(g.og ? { og: true } : {}) }))
       .filter(g => g.n);
     const trim = arr => { const a = arr.map(v => (v === 1 || v === 0 ? v : null)); while (a.length && a[a.length - 1] === null) a.pop(); return a; };
@@ -926,13 +981,15 @@
       m.hs = done ? hs : null;
       m.as = done ? as : null;
       if (goals.length) m.goals = goals; else delete m.goals;
+      if (ff) m.ff = ff; else delete m.ff;
+      delete m.ffAuto;
       if (!tie) { m.hp = null; m.ap = null; delete m.pens; }
       else if (touched) {
         if (hasKicks) { m.pens = pens; m.hp = kicksMade(pens.h); m.ap = kicksMade(pens.a); }
         else { delete m.pens; m.hp = null; m.ap = null; }
       }
       if (m.stage === 'group' && m.hp === null && m.ap === null) { delete m.hp; delete m.ap; }
-    }, `${commitTitle(m0)} ${clear ? '결과 삭제' : done ? `결과 ${hs}:${as}` : '수정'}`));
+    }, `${commitTitle(m0)} ${clear ? '결과 삭제' : ff ? `${(ff === 'h' ? editDraft.sides.home : editDraft.sides.away).team ? teamShort((ff === 'h' ? editDraft.sides.home : editDraft.sides.away).team) : ''} 기권` : done ? `결과 ${hs}:${as}` : '수정'}`));
   }
 
   // ---------- team page ----------
@@ -955,13 +1012,13 @@
       : `<span class="crest xxl inv">${look.no}</span>`;
     return `<div class="hero team-hero tc" style="${tcVars(look.color)}">
       <div class="grip"></div>
-      <div class="th-row">${big}<div class="th-text"><div class="th-name">${look.name}</div><div class="th-sub">${sub}</div></div></div>
+      <div class="th-row">${big}<div class="th-text"><div class="th-name${look.wd ? ' wd' : ''}">${look.name}</div><div class="th-sub">${sub}</div></div></div>
     </div>`;
   }
   function openTeam(id) {
     const { row, pos, table } = teamPosition(id);
     const t = teamObj(id);
-    const posText = table.done && row.tied ? `${t.group}조 ?위` : `${t.group}조 ${pos}위`;
+    const posText = t.withdrawn ? `${t.group}조 기권` : table.done && row.tied ? `${t.group}조 ?위` : `${t.group}조 ${pos}위`;
     const sub = t.name && t.name.trim() ? `2학년 ${classNo(id)}반<span class="sep"></span>${posText}` : posText;
     const stat = (k, v, cls = '') => `<div class="st ${cls}"><div class="v">${v}</div><div class="k">${k}</div></div>`;
     const ms = teamMatches(id);
@@ -975,7 +1032,7 @@
         ${isAdmin() ? `<button class="btn" type="button" data-act="team-edit" data-id="${id}">팀 꾸미기</button>` : ''}
         <button class="btn" type="button" data-act="close">닫기</button>
       </div>`;
-    openSheet(body, teamHero(teamLook(id), sub));
+    openSheet(body, teamHero({ ...teamLook(id), wd: isWd(id) }, sub));
   }
 
   // ---------- image upload ----------
@@ -1017,7 +1074,7 @@
       <p class="lead">팀을 골라 이름, 팀 컬러, 로고를 바꿀 수 있음. 바꾼 색과 로고는 경기, 순위, 토너먼트 화면 전체에 쓰임.</p>
       ${L.GROUPS.map(g => `<div class="sheet-sec">${g}조</div><div class="sheet-list">
         ${state.data.teams.filter(t => t.group === g).map(t => `<button class="team-item" type="button" data-act="team-edit" data-id="${t.id}">
-          ${crest(t.id)}<span class="nm">${teamName(t.id)}</span><span class="sw" style="background:${colorOf(t.id)}"></span>${ICON.chev}</button>`).join('')}
+          ${nameCell(t.id)}<span class="sp"></span><span class="sw" style="background:${colorOf(t.id)}"></span>${ICON.chev}</button>`).join('')}
       </div>`).join('')}
       <div class="btns" style="margin-top:16px"><button class="btn" type="button" data-act="close">닫기</button></div>`;
     openSheet(body);
@@ -1028,11 +1085,13 @@
       color: teamDraft.color,
       logo: teamDraft.logo,
       name: esc((teamDraft.name || '').trim() || `2학년 ${classNo(teamDraft.id)}반`),
+      wd: teamDraft.withdrawn,
     };
   }
   function openTeamEdit(id) {
     const t = teamObj(id);
-    teamDraft = { id, name: t.name || '', color: colorOf(id), logo: logoOf(id) };
+    teamDraft = { id, name: t.name || '', color: colorOf(id), logo: logoOf(id), withdrawn: !!t.withdrawn };
+    const left = state.data.matches.filter(m => m.stage === 'group' && !m.done && (m.home === id || m.away === id)).length;
     const body = `
       <div class="field"><label for="f-name">팀 이름</label>
         <input id="f-name" class="input" maxlength="12" value="${esc(teamDraft.name)}" placeholder="2학년 ${classNo(id)}반">
@@ -1050,6 +1109,11 @@
           </div>
         </div>
         <p class="hint">정사각형에 배경이 투명한 PNG가 가장 깔끔함. 160px로 줄여서 저장됨.</p></div>
+      <div class="field"><span class="lab">대회 기권</span>
+        <label class="check wd-check"><input type="checkbox" id="f-wd" ${teamDraft.withdrawn ? 'checked' : ''}><span class="t">이 팀 기권 처리</span></label>
+        <p class="hint">${teamDraft.withdrawn
+          ? '체크를 풀면 기권으로 처리됐던 남은 경기가 다시 예정 경기로 돌아감.'
+          : `남은 조별 경기 ${left}개가 모두 상대 팀 ${FF_GOALS}:0 기권승으로 처리되고, 순위표에서 최하위로 내려감. 이미 치른 경기 결과는 그대로.`}</p></div>
       <p class="msg"></p>
       <div class="btns">
         <button class="btn" type="button" data-act="close">취소</button>
@@ -1072,7 +1136,7 @@
     $('#logoClear').hidden = !teamDraft.logo;
   }
   async function saveTeam(btn) {
-    const { id, color, logo } = teamDraft;
+    const { id, color, logo, withdrawn } = teamDraft;
     const name = (teamDraft.name || '').trim().slice(0, 12);
     const label = name || `2학년 ${classNo(id)}반`;
     await runSave(btn, () => save(d => {
@@ -1080,7 +1144,25 @@
       if (name && name !== `2학년 ${classNo(id)}반`) t.name = name; else delete t.name;
       if (color.toLowerCase() !== DEFAULT_COLOR[classNo(id)]) t.color = color.toLowerCase(); else delete t.color;
       if (logo) t.logo = logo; else delete t.logo;
-    }, `팀 수정 (${label})`));
+      const was = !!t.withdrawn;
+      if (withdrawn) t.withdrawn = true; else delete t.withdrawn;
+      if (withdrawn && !was) {
+        // Every group match the team has not played becomes a forfeit win for the opponent.
+        d.matches.forEach(m => {
+          if (m.stage !== 'group' || m.done || (m.home !== id && m.away !== id)) return;
+          const side = m.home === id ? 'h' : 'a';
+          Object.assign(m, { done: true, ff: side, ffAuto: true, hs: side === 'h' ? 0 : FF_GOALS, as: side === 'h' ? FF_GOALS : 0 });
+          delete m.goals; delete m.pens; delete m.hp; delete m.ap;
+        });
+      }
+      if (!withdrawn && was) {
+        d.matches.forEach(m => {
+          if (!m.ffAuto || (m.ff === 'h' ? m.home : m.away) !== id) return;
+          Object.assign(m, { done: false, hs: null, as: null });
+          delete m.ff; delete m.ffAuto;
+        });
+      }
+    }, withdrawn !== !!teamObj(id).withdrawn ? `${label} ${withdrawn ? '기권 처리' : '기권 취소'}` : `팀 수정 (${label})`));
   }
 
   // ---------- league editor ----------
@@ -1318,6 +1400,17 @@
         renderShootEdit();
         break;
       case 'swatch': teamDraft.color = el.dataset.c; syncTeamDraft(); break;
+      case 'ff': {
+        const v = el.dataset.v || null;
+        editDraft.ff = v;
+        if (v) {
+          $('#sheet input[name="hs"]').value = v === 'h' ? 0 : FF_GOALS;
+          $('#sheet input[name="as"]').value = v === 'h' ? FF_GOALS : 0;
+          $('#f-done').checked = true;
+        }
+        syncFf();
+        break;
+      }
       case 'logo-clear': teamDraft.logo = null; syncTeamDraft(); break;
       case 'save-team': saveTeam(el); break;
       case 'llogo-clear': leagueDraft.logo = null; syncLeagueDraft(); break;
@@ -1391,6 +1484,7 @@
   });
   document.addEventListener('change', async e => {
     const t = e.target;
+    if (t.id === 'f-wd' && teamDraft) { teamDraft.withdrawn = t.checked; syncTeamDraft(); return; }
     if (t.id === 'f-logo' || t.id === 'f-llogo') {
       const file = t.files && t.files[0];
       t.value = '';

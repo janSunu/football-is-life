@@ -4,7 +4,14 @@
   const GROUPS = ['A', 'B', 'C'];
 
   function emptyRow(team) {
-    return { team: team.id, group: team.group, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0, pts: 0, form: [] };
+    return { team: team.id, group: team.group, wd: !!team.withdrawn, p: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, gd: 0, pts: 0, form: [] };
+  }
+
+  // Side that wins a forfeited match ('h' or 'a'), whatever score was entered.
+  function ffWinner(m) {
+    if (m.ff === 'h') return 'a';
+    if (m.ff === 'a') return 'h';
+    return null;
   }
 
   function isScored(m) {
@@ -45,9 +52,11 @@
       h.gf += m.hs; h.ga += m.as; a.gf += m.as; a.ga += m.hs;
       // A shootout win counts as a win (3 points), a shootout loss as a loss.
       // Goal difference and goals scored use the regulation score only.
+      // A forfeit is a win for the side that turned up.
       const pk = m.hs === m.as && Number.isInteger(m.hp) && Number.isInteger(m.ap) && m.hp !== m.ap;
-      const homeWon = m.hs > m.as || (pk && m.hp > m.ap);
-      const awayWon = m.as > m.hs || (pk && m.ap > m.hp);
+      const ffw = ffWinner(m);
+      const homeWon = ffw ? ffw === 'h' : m.hs > m.as || (pk && m.hp > m.ap);
+      const awayWon = ffw ? ffw === 'a' : m.as > m.hs || (pk && m.ap > m.hp);
       if (homeWon) { h.w++; a.l++; h.pts += 3; h.form.push('W'); a.form.push('L'); }
       else if (awayWon) { a.w++; h.l++; a.pts += 3; h.form.push('L'); a.form.push('W'); }
       else { h.d++; a.d++; h.pts++; a.pts++; h.form.push('D'); a.form.push('D'); }
@@ -55,7 +64,9 @@
     const list = Object.values(rows);
     list.forEach(r => { r.gd = r.gf - r.ga; });
 
-    const cmp = cmpWithLots(data.lots, g, r => r.team);
+    // A withdrawn team drops to the bottom whatever its points.
+    const cmpLots = cmpWithLots(data.lots, g, r => r.team);
+    const cmp = (a, b) => (a.wd - b.wd) || cmpLots(a, b);
     // Stable base order by seed so the empty table reads A1, A2, A3.
     const seedOrder = teams.map(t => t.id);
     list.sort((a, b) => cmp(a, b) || seedOrder.indexOf(a.team) - seedOrder.indexOf(b.team));
@@ -65,10 +76,11 @@
       const prev = list[i - 1], next = list[i + 1];
       r.tiedPrev = !!prev && cmp(prev, r) === 0;
       r.tiedNext = !!next && cmp(r, next) === 0;
-      r.tied = r.tiedPrev || r.tiedNext;
+      r.tied = !r.wd && (r.tiedPrev || r.tiedNext);
       r.rank = r.tiedPrev ? prev.rank : i + 1;
       // Tied only on the three stats, before any lottery was applied.
-      r.statTie = (!!prev && cmpStats(prev, r) === 0) || (!!next && cmpStats(r, next) === 0);
+      const same = o => !!o && !o.wd && !r.wd && cmpStats(o, r) === 0;
+      r.statTie = same(prev) || same(next);
     });
 
     const done = matches.length > 0 && matches.every(isScored);
@@ -82,6 +94,7 @@
     const label = `${table.group}조 ${pos}위`;
     if (!table.done) return { pending: true, label };
     const r = table.rows[pos - 1];
+    if (!r || r.wd) return { unknown: true, label };
     if (r.tied) return { unknown: true, label, tieKey: table.group };
     return { team: r.team, label };
   }
@@ -104,13 +117,21 @@
 
   function candidatesOf(tables) {
     return tables.map(t => {
-      const r = t.rows[1];
-      return { ...r, group: t.group, ambiguous: r.tied };
-    });
+      const r = t.rows.filter(x => !x.wd)[1];
+      return r ? { ...r, group: t.group, ambiguous: r.tied } : null;
+    }).filter(Boolean);
   }
 
-  function winnerOf(m, home, away) {
-    if (!home.team || !away.team || !isScored(m)) return null;
+  function winnerOf(m, home, away, wd = new Set()) {
+    if (!home.team || !away.team) return null;
+    if (!isScored(m)) {
+      // A withdrawn team gives up any match it has not played yet.
+      const hw = wd.has(home.team), aw = wd.has(away.team);
+      if (hw !== aw) return hw ? away.team : home.team;
+      return null;
+    }
+    const ffw = ffWinner(m);
+    if (ffw) return ffw === 'h' ? home.team : away.team;
     if (m.hs > m.as) return home.team;
     if (m.as > m.hs) return away.team;
     if (Number.isInteger(m.hp) && Number.isInteger(m.ap) && m.hp !== m.ap) {
@@ -119,10 +140,10 @@
     return null;
   }
 
-  function koSlot(m, home, away, label) {
-    if (!isScored(m)) return { pending: true, label };
-    const w = winnerOf(m, home, away);
-    return w ? { team: w, label } : { unknown: true, label };
+  function koSlot(m, home, away, label, wd) {
+    const w = winnerOf(m, home, away, wd);
+    if (w) return { team: w, label };
+    return isScored(m) ? { unknown: true, label } : { pending: true, label };
   }
 
   function compute(data) {
@@ -130,16 +151,17 @@
     const byId = Object.fromEntries(data.matches.map(m => [m.id, m]));
     const t = Object.fromEntries(tables.map(x => [x.group, x]));
     const wc = wildcard(tables, data.lots);
+    const wd = new Set(data.teams.filter(x => x.withdrawn).map(x => x.id));
 
     const sf1 = { home: groupSlot(t.A, 1), away: groupSlot(t.B, 1) };
     const sf2 = { home: groupSlot(t.C, 1), away: wc };
-    sf1.winner = winnerOf(byId.SF1, sf1.home, sf1.away);
-    sf2.winner = winnerOf(byId.SF2, sf2.home, sf2.away);
+    sf1.winner = winnerOf(byId.SF1, sf1.home, sf1.away, wd);
+    sf2.winner = winnerOf(byId.SF2, sf2.home, sf2.away, wd);
     const fin = {
-      home: koSlot(byId.SF1, sf1.home, sf1.away, '준결승 1 승자'),
-      away: koSlot(byId.SF2, sf2.home, sf2.away, '준결승 2 승자'),
+      home: koSlot(byId.SF1, sf1.home, sf1.away, '준결승 1 승자', wd),
+      away: koSlot(byId.SF2, sf2.home, sf2.away, '준결승 2 승자', wd),
     };
-    fin.winner = winnerOf(byId.F, fin.home, fin.away);
+    fin.winner = winnerOf(byId.F, fin.home, fin.away, wd);
 
     // Teams on each knockout match, keyed by match id, for the fixture list.
     const sides = { SF1: sf1, SF2: sf2, F: fin };
@@ -196,7 +218,7 @@
   }
 
   const api = {
-    compute, groupTable, isScored, cmpStats, GROUPS,
+    compute, ffWinner, groupTable, isScored, cmpStats, GROUPS,
     PLAY_DAYS, shiftPlayDays, playDaysBetween, reschedule, isPlayDay, addDays,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

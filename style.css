@@ -271,7 +271,7 @@ main { max-width: 760px; margin: 0 auto; padding: 12px 12px 40px; }
 .stats .st + .st { border-left: 1px solid var(--line); }
 .stats .v { font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; }
 .stats .sm .v { font-size: 14px; line-height: 21px; }
-.stats .k { font-size: 11px; color: var(--text-2); margin-top: 1px; }
+.stats .k { white-space: nowrap; font-size: 11px; color: var(--text-2); margin-top: 1px; }
 .sheet-sec { font-size: 12px; font-weight: 600; color: var(--text-2); margin: 4px 2px 8px; }
 .sheet-list { background: var(--card-2); border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
 .sheet-list .fx { padding-left: 12px; padding-right: 8px; border-top-color: var(--line); }
@@ -441,15 +441,15 @@ main { max-width: 760px; margin: 0 auto; padding: 12px 12px 40px; }
 .sh-kicks, .se-kicks { flex: 1; display: grid; grid-template-columns: repeat(var(--n), 26px); gap: 6px; overflow-x: auto; }
 .sh-n, .se-n { width: 22px; text-align: right; font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; color: var(--text-2); }
 .sh-row.win .sh-n { color: var(--text); }
-.k { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-style: normal; }
-.k.ok { background: var(--win); color: #fff; }
-.k.miss { background: transparent; color: var(--loss); box-shadow: inset 0 0 0 2px var(--loss); }
-.k.none { box-shadow: inset 0 0 0 1.5px var(--line); }
+.sh-kicks .k, .se-kicks .k { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-style: normal; }
+.sh-kicks .k.ok, .se-kicks .k.ok { background: var(--win); color: #fff; }
+.sh-kicks .k.miss, .se-kicks .k.miss { background: transparent; color: var(--loss); box-shadow: inset 0 0 0 2px var(--loss); }
+.sh-kicks .k.none, .se-kicks .k.none { box-shadow: inset 0 0 0 1.5px var(--line); }
 
 .shoot-edit { background: var(--card-2); border-radius: 12px; padding: 12px 12px 10px; }
 .se-kicks { grid-template-columns: repeat(var(--n), 32px); gap: 6px; padding: 2px; }
 .se-kicks .k { width: 32px; height: 32px; }
-.se-kicks .k.none { color: var(--text-3); font-size: 11px; font-weight: 600; box-shadow: inset 0 0 0 1.5px var(--text-3); opacity: .7; }
+.se-kicks .sh-kicks .k.none, .se-kicks .k.none { color: var(--text-3); font-size: 11px; font-weight: 600; box-shadow: inset 0 0 0 1.5px var(--text-3); opacity: .7; }
 .se-kicks .k:active { transform: scale(.92); }
 .se-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .se-foot .hint { margin: 0; font-size: 11px; }
@@ -502,3 +502,29 @@ main { max-width: 760px; margin: 0 auto; padding: 12px 12px 40px; }
 .br-date span { margin-left: 6px; }
 .sched-round { font-size: 12px; font-weight: 800; color: var(--text-2); margin: 14px 0 2px; }
 .sched-round:first-child { margin-top: 0; }
+
+/* Forfeits and withdrawn teams */
+.ff > .nm, .nm.wd, .th-name.wd {
+  text-decoration: line-through; text-decoration-thickness: 1.5px;
+}
+.fx-team.ff .nm, .br-row.ff .nm, .mh-team.ff .nm, .nm.wd { color: var(--text-3); }
+.fx-team.ff .crest, .br-row.ff .crest, .mh-team.ff .crest, .wd-row .crest, .team-item .nm.wd ~ .sw { opacity: .4; filter: grayscale(1); }
+.ft-team.ff .nm { opacity: .6; }
+.ft-team.ff .crest { opacity: .55; filter: grayscale(.8); }
+.th-name.wd { opacity: .8; }
+.wd-tag { font-style: normal; font-size: 11px; font-weight: 700; color: var(--loss); margin-left: -2px; flex: none; }
+.tbl tr.wd-row td { color: var(--text-3); }
+.tbl tr.wd-row td.pts { font-weight: 600; }
+.tbl tr.wd-row .form-row { opacity: .45; }
+.ffx { color: var(--loss); font-weight: 800; font-size: 13px; }
+.mh-score .vs.ffx { font-size: 18px; }
+.pk.ff-l, .br-date .ff-l { color: var(--loss); }
+.ff-note { margin: 0 0 16px; padding: 12px 14px; border-radius: 10px; background: var(--card-2); font-size: 13px; color: var(--text-2); box-shadow: inset 3px 0 0 var(--loss); }
+.team-item .sp { display: none; }
+
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 10px; background: var(--input); }
+.seg button { height: 36px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--text-2); padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seg button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, .14); }
+.seg button.on.danger { color: var(--loss); }
+.wd-check { border-bottom: 0; margin-bottom: 0; }
+.wd-check input { accent-color: var(--loss); }
