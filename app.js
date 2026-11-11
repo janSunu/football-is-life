@@ -9,7 +9,7 @@
   const DATA_PATH = 'data.json';
   const TOKEN_KEY = 'lunchleague.token';
   const TAB_KEY = 'lunchleague.tab';
-  const DEFAULT_LEAGUE = { name: '경신 런치리그', sub: '2학년', tagline: '무려 수작업으로 업데이트되는 최첨단 시스템' };
+  const DEFAULT_LEAGUE = { name: '경신 런치리그', sub: '2학년', tagline: '개발(자)' };
   const TABS = ['fixtures', 'table', 'bracket', 'stats'];
   const ROUNDS = [
     { key: 'D1', title: '경기일 1', ids: ['M1', 'M2', 'M3'] },
