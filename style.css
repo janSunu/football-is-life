@@ -528,3 +528,7 @@ main { max-width: 760px; margin: 0 auto; padding: 12px 12px 40px; }
 .seg button.on.danger { color: var(--loss); }
 .wd-check { border-bottom: 0; margin-bottom: 0; }
 .wd-check input { accent-color: var(--loss); }
+
+/* Scorer appearances */
+.apps-edit { max-width: 200px; }
+.scorers td.manual { text-decoration: underline dotted var(--text-3); text-underline-offset: 3px; }

@@ -264,7 +264,8 @@
       `  "league": ${JSON.stringify(d.league || {})},\n` +
       '  "teams": [\n' + d.teams.map(line).join(',\n') + '\n  ],\n' +
       '  "matches": [\n' + d.matches.map(line).join(',\n') + '\n  ],\n' +
-      `  "lots": ${JSON.stringify(d.lots || {})}\n}\n`;
+      `  "lots": ${JSON.stringify(d.lots || {})},\n` +
+      `  "apps": ${JSON.stringify(d.apps || {})}\n}\n`;
   }
 
   async function load() {
@@ -358,8 +359,27 @@
       }
     }
     const list = [...map.values()].sort((a, b) => b.goals - a.goals || a.name.localeCompare(b.name, 'ko'));
-    list.forEach((r, i) => { r.rank = i && list[i - 1].goals === r.goals ? list[i - 1].rank : i + 1; });
+    list.forEach((r, i) => {
+      r.rank = i && list[i - 1].goals === r.goals ? list[i - 1].rank : i + 1;
+      r.key = `${r.team}|${r.name}`;
+      r.autoApps = teamPlayed(r.team);
+      const v = appsOverride(r.key);
+      r.manual = v !== null;
+      r.apps = r.manual ? v : r.autoApps;
+    });
     return list;
+  }
+  // Matches a team has actually played: finished, and not decided by a forfeit.
+  function teamPlayed(team) {
+    return state.data.matches.filter(m => {
+      if (!L.isScored(m) || m.ff) return false;
+      const s = sidesOf(m);
+      return s.home.team === team || s.away.team === team;
+    }).length;
+  }
+  function appsOverride(key) {
+    const v = state.data.apps && state.data.apps[key];
+    return Number.isInteger(v) && v >= 0 ? v : null;
   }
   function namesFor(team) {
     const names = new Set();
@@ -677,11 +697,11 @@
       </button>`;
     }
     html += `<div class="card">
-      <div class="card-head"><span>득점 순위</span><span class="sub">자책골 제외</span></div>
+      <div class="card-head"><span>득점 순위</span><span class="sub">${isAdmin() ? '선수를 누르면 경기 수 수정' : '자책골 제외'}</span></div>
       ${sc.length ? `<table class="tbl scorers"><thead><tr><th class="l" style="padding-left:16px">#</th><th class="l">선수</th><th class="c">경기</th><th class="pts">골</th></tr></thead><tbody>
-        ${sc.map(r => `<tr data-act="team" data-id="${r.team}"><td class="pos">${r.rank}</td>
+        ${sc.map(r => `<tr ${isAdmin() ? `data-act="apps" data-key="${esc(r.key)}"` : `data-act="team" data-id="${r.team}"`}><td class="pos">${r.rank}</td>
           <td class="team l"><span>${crest(r.team)}<span class="pl"><b>${esc(r.name)}</b><small>${teamName(r.team)}</small></span></span></td>
-          <td class="c">${r.matches.size}</td><td class="pts">${r.goals}</td></tr>`).join('')}
+          <td class="c${isAdmin() && r.manual ? ' manual' : ''}">${r.apps}</td><td class="pts">${r.goals}</td></tr>`).join('')}
       </tbody></table>` : '<p class="empty">아직 아무도 골을 넣지 않았나 보네요.<br>아니면 죄다 자책골이었거나</p>'}
     </div>`;
     const tt = teamTotals();
@@ -990,6 +1010,35 @@
       }
       if (m.stage === 'group' && m.hp === null && m.ap === null) { delete m.hp; delete m.ap; }
     }, `${commitTitle(m0)} ${clear ? '결과 삭제' : ff ? `${(ff === 'h' ? editDraft.sides.home : editDraft.sides.away).team ? teamShort((ff === 'h' ? editDraft.sides.home : editDraft.sides.away).team) : ''} 기권` : done ? `결과 ${hs}:${as}` : '수정'}`));
+  }
+
+  // ---------- scorer appearances ----------
+  let appsDraft = null;
+  function openApps(key) {
+    const r = scorerTable().find(x => x.key === key);
+    if (!r) return;
+    appsDraft = { key, name: r.name, auto: r.autoApps };
+    openSheet(`<h2>${esc(r.name)}</h2>
+      <p class="lead">${teamName(r.team)}, ${r.goals}골</p>
+      <div class="field"><span class="lab">경기 수</span>
+        <div class="apps-edit">${stepper('apps', r.apps)}</div>
+        <p class="hint">자동 계산은 ${r.autoApps}경기 (소속팀이 치른 경기, 기권 경기 제외). 실제로 뛴 경기 수가 다르면 직접 바꾸면 됨.</p>
+      </div>
+      <p class="msg"></p>
+      <div class="btns">
+        ${r.manual ? '<button class="btn ghost" type="button" data-act="apps-auto">자동으로</button>' : ''}
+        <button class="btn" type="button" data-act="close">취소</button>
+        <button class="btn primary" type="button" data-act="save-apps">저장</button>
+      </div>`);
+  }
+  async function saveApps(btn, auto) {
+    const { key, name, auto: autoN } = appsDraft;
+    const v = auto ? null : readInt('apps');
+    if (!auto && v === null) { sheetError('경기 수 입력 필요.'); return; }
+    await runSave(btn, () => save(d => {
+      d.apps = d.apps || {};
+      if (v === null || v === autoN) delete d.apps[key]; else d.apps[key] = v;
+    }, `${name} 경기 수 ${v === null || v === autoN ? '자동' : v}`));
   }
 
   // ---------- team page ----------
@@ -1331,6 +1380,7 @@
     if (step) {
       const input = $(`#sheet input[name="${step.dataset.for}"]`);
       input.value = Math.max(0, Math.min(99, (parseInt(input.value, 10) || 0) + Number(step.dataset.step)));
+      if (input.name === 'apps') return;
       if (readInt('hs') === null) $('#sheet input[name="hs"]').value = 0;
       if (readInt('as') === null) $('#sheet input[name="as"]').value = 0;
       $('#f-done').checked = true;
@@ -1346,6 +1396,9 @@
       case 'close': closeSheet(); break;
       case 'match': openMatch(id); break;
       case 'team': openTeam(id); break;
+      case 'apps': if (isAdmin()) openApps(el.dataset.key); break;
+      case 'save-apps': saveApps(el, false); break;
+      case 'apps-auto': saveApps(el, true); break;
       case 'teams': openTeamList(); break;
       case 'team-edit': if (isAdmin()) openTeamEdit(id); break;
       case 'league': openLeague(); break;
